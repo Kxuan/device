@@ -55,12 +55,6 @@ private:
 private:
     Glib::RefPtr<Glib::MainLoop> loop;
     Glib::Thread *worker;
-    Glib::RefPtr<Gst::Pipeline> pipeline;
-    Glib::RefPtr<Gst::Element> v4l2src;
-    Glib::RefPtr<Gst::Element> videoconvert;
-    Glib::RefPtr<Gst::Element> x264enc;
-    Glib::RefPtr<Gst::Element> rtph264pay;
-
     Glib::RefPtr<Gst::AppSink> appsink;
 };
 

@@ -58,22 +58,36 @@ Gst::FlowReturn VideoBus::onNewSample()
 
 void VideoBus::run()
 {
-    pipeline = Gst::Pipeline::create();
-    v4l2src = Gst::ElementFactory::create_element("v4l2src");
+
+    auto pipeline = Gst::Pipeline::create();
+    auto v4l2src = Gst::ElementFactory::create_element("v4l2src");
     std::string devicename = "/dev/video0";
     v4l2src->set_property("device", devicename);
-    videoconvert = Gst::VideoConvert::create();
-    x264enc = Gst::ElementFactory::create_element("x264enc");
-    rtph264pay = Gst::ElementFactory::create_element("rtph264pay");
 
     appsink = Gst::AppSink::create();
     appsink->signal_new_sample().connect(sigc::mem_fun(*this, &VideoBus::onNewSample));
     appsink->set_property("emit-signals", true);
 
+#ifdef __x86_64__
+    auto videoconvert = Gst::VideoConvert::create();
+    auto x264enc = Gst::ElementFactory::create_element("x264enc");
+    auto rtph264pay = Gst::ElementFactory::create_element("rtph264pay");
+
     pipeline->add(v4l2src)->add(videoconvert)->add(x264enc)->add(rtph264pay)->add(appsink);
     v4l2src->link(videoconvert)->link(x264enc)->link(rtph264pay)->link(appsink);
+#else
+    auto rtph264pay = Gst::ElementFactory::create_element("rtph264pay");
+    auto caps = Gst::Caps::create_simple("video/x-h264",
+                                         "width", 1280,
+                                         "height", 720,
+                                         "framerate", "30/1");
+
+    pipeline->add(v4l2src)->add(rtph264pay)->add(appsink);
+    v4l2src->link(rtph264pay, caps)->link(appsink);
+#endif
 
     pipeline->set_state(Gst::State::STATE_PLAYING);
     loop->run();
     pipeline->set_state(Gst::State::STATE_NULL);
+    appsink.reset();
 }
