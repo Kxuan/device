@@ -32,27 +32,35 @@
 #define DEVICE_PORT_HPP
 
 #include <string>
+#include <set>
 #include <boost/array.hpp>
 #include <boost/asio.hpp>
+#include "VideoBus.hpp"
 
 class Port
 {
 public:
-    Port(boost::asio::io_context &io_context, const std::string &name);
+    Port(boost::asio::io_context &io_context, const std::string &name, VideoBus &bus);
 
 private:
     void start_receive();
-    void handle_receive(const boost::system::error_code& error,
+
+    void handle_receive(const boost::system::error_code &error,
                         std::size_t /*bytes_transferred*/);
 
-    void handle_send(const std::shared_ptr<std::string>& /*message*/,
+    void handle_send(const std::shared_ptr<std::string> & /*message*/,
                      const boost::system::error_code & /*error*/,
                      std::size_t /*bytes_transferred*/);
+
+    void handle_new_sample(const uint8_t *data, size_t size);
+
 private:
     boost::asio::ip::udp::socket socket_;
     boost::asio::ip::udp::endpoint remote_endpoint_;
     boost::array<char, 1 << 16> recv_buffer_;
     std::string name;
+    std::set<boost::asio::ip::udp::endpoint> endpoints;
+    boost::signals2::connection connection;
 };
 
 

@@ -28,56 +28,52 @@
  * POSSIBILITY OF SUCH DAMAGE.
  * 
  */
-
-#include "config.h"
-#include "Port.hpp"
-#include <memory>
-#include <boost/bind.hpp>
+#include "VideoBus.hpp"
+#include <gstreamermm.h>
+#include <glibmm.h>
 #include <iostream>
 
-using boost::asio::ip::udp;
-
-Port::Port(boost::asio::io_context &io_context, const std::string &name, VideoBus &bus)
-        : socket_(io_context, udp::endpoint(udp::v6(), DEFAULT_PORT_NUMBER)),
-          name(name)
+VideoBus::VideoBus()
 {
+    Glib::thread_init();
+    Gst::init();
 
-    connection = bus.connect(std::bind(&Port::handle_new_sample, this, std::placeholders::_1, std::placeholders::_2));
-    start_receive();
+    loop = Glib::MainLoop::create();
+    worker = Glib::Thread::create(sigc::mem_fun(*this, &VideoBus::run));
 }
 
-void Port::start_receive()
+Gst::FlowReturn VideoBus::onNewSample()
 {
-    socket_.async_receive_from(
-            boost::asio::buffer(recv_buffer_), remote_endpoint_,
-            boost::bind(&Port::handle_receive, this,
-                        boost::asio::placeholders::error,
-                        boost::asio::placeholders::bytes_transferred));
-}
+    auto sample = appsink->pull_sample();
+    if (sample) {
+        auto buf = sample->get_buffer();
+        Gst::MapInfo mi;
+        buf->map(mi, Gst::MapFlags::MAP_READ);
 
-void Port::handle_receive(const boost::system::error_code &error, std::size_t nbytes)
-{
-    if (!error) {
-        endpoints.emplace(remote_endpoint_);
-        std::cout << "New endpoint: " << remote_endpoint_ << std::endl;
-        start_receive();
+        (*this)(mi.get_data(), mi.get_size());
+        buf->unmap(mi);
     }
+    return Gst::FlowReturn::FLOW_OK;
 }
 
-void Port::handle_send(const std::shared_ptr<std::string> &ptr, const boost::system::error_code &ec, std::size_t nbytes)
+void VideoBus::run()
 {
-    std::cout << *ptr << ec.message() << nbytes << std::endl;
-}
+    pipeline = Gst::Pipeline::create();
+    v4l2src = Gst::ElementFactory::create_element("v4l2src");
+    std::string devicename = "/dev/video0";
+    v4l2src->set_property("device", devicename);
+    videoconvert = Gst::VideoConvert::create();
+    x264enc = Gst::ElementFactory::create_element("x264enc");
+    rtph264pay = Gst::ElementFactory::create_element("rtph264pay");
 
-void Port::handle_new_sample(const uint8_t *data, size_t size)
-{
-    std::promise<void> p;
-    boost::asio::post(boost::asio::bind_executor(socket_.get_executor(), [this, data, size, &p]() {
-        for (auto &ep:endpoints) {
-            socket_.send_to(boost::asio::buffer(data, size), ep);
-        }
-        p.set_value();
-    }));
-    auto f = p.get_future();
-    f.wait();
+    appsink = Gst::AppSink::create();
+    appsink->signal_new_sample().connect(sigc::mem_fun(*this, &VideoBus::onNewSample));
+    appsink->set_property("emit-signals", true);
+
+    pipeline->add(v4l2src)->add(videoconvert)->add(x264enc)->add(rtph264pay)->add(appsink);
+    v4l2src->link(videoconvert)->link(x264enc)->link(rtph264pay)->link(appsink);
+
+    pipeline->set_state(Gst::State::STATE_PLAYING);
+    loop->run();
+    pipeline->set_state(Gst::State::STATE_NULL);
 }
