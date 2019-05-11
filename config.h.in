@@ -1,0 +1,3 @@
+#ifndef XIOT_DEVICE_CONFIG_H
+#cmakedefine DEFAULT_PORT_NUMBER @DEFAULT_PORT_NUMBER@
+#endif
