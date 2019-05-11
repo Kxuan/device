@@ -38,7 +38,7 @@
 class Port
 {
 public:
-    Port(boost::asio::io_context &io_context);
+    Port(boost::asio::io_context &io_context, const std::string &name);
 
 private:
     void start_receive();
@@ -52,6 +52,7 @@ private:
     boost::asio::ip::udp::socket socket_;
     boost::asio::ip::udp::endpoint remote_endpoint_;
     boost::array<char, 1 << 16> recv_buffer_;
+    std::string name;
 };
 
 

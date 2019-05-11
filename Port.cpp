@@ -37,14 +37,11 @@
 
 using boost::asio::ip::udp;
 
-Port::Port(boost::asio::io_context &io_context)
-        : socket_(io_context, udp::endpoint(udp::v6(), DEFAULT_PORT_NUMBER))
+Port::Port(boost::asio::io_context &io_context, const std::string &name)
+        : socket_(io_context, udp::endpoint(udp::v6(), DEFAULT_PORT_NUMBER)),
+          name(name)
 {
-    socket_.async_receive_from(
-            boost::asio::buffer(recv_buffer_), remote_endpoint_,
-            boost::bind(&Port::handle_receive, this,
-                        boost::asio::placeholders::error,
-                        boost::asio::placeholders::bytes_transferred));
+    start_receive();
 }
 
 void Port::start_receive()
@@ -56,9 +53,10 @@ void Port::start_receive()
                         boost::asio::placeholders::bytes_transferred));
 }
 
-void Port::handle_receive(const boost::system::error_code &error, std::size_t)
+void Port::handle_receive(const boost::system::error_code &error, std::size_t nbytes)
 {
     if (!error) {
+
         std::shared_ptr<std::string> message(
                 new std::string(remote_endpoint_.address().to_string()));
 
@@ -71,7 +69,7 @@ void Port::handle_receive(const boost::system::error_code &error, std::size_t)
     }
 }
 
-void Port::handle_send(const std::shared_ptr<std::string>& ptr, const boost::system::error_code &ec, std::size_t nbytes)
+void Port::handle_send(const std::shared_ptr<std::string> &ptr, const boost::system::error_code &ec, std::size_t nbytes)
 {
     std::cout << *ptr << ec.message() << nbytes << std::endl;
 }
