@@ -14,10 +14,12 @@ configure_file(config.h.in config.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 pkg_check_modules(GSTMM REQUIRED gstreamermm-1.0)
-pkg_check_modules(GTKMM REQUIRED gtkmm-2.4)
-include_directories(${GTKMM_INCLUDE_DIRS} ${GSTMM_INCLUDE_DIRS})
-link_directories(${GTKMM_LIBRARY_DIRS} ${GSTMM_LIBRARY_DIRS})
+pkg_check_modules(GLIBMM REQUIRED glibmm-2.4)
+include_directories(${GLIBMM_INCLUDE_DIRS} ${GSTMM_INCLUDE_DIRS})
+link_directories(${GLIBMM_LIBRARY_DIRS} ${GSTMM_LIBRARY_DIRS})
 
-add_executable(device main.cpp Port.cpp Port.hpp VideoBus.cpp VideoBus.hpp)
-target_link_libraries(device ${GTKMM_LIBRARIES} ${GSTMM_LIBRARIES})
-target_link_libraries(device ${Boost_LIBRARIES})
+add_executable(rpi-cam-streaming main.cpp Port.cpp Port.hpp VideoBus.cpp VideoBus.hpp)
+target_link_libraries(rpi-cam-streaming ${GLIBMM_LIBRARIES} ${GSTMM_LIBRARIES})
+target_link_libraries(rpi-cam-streaming ${Boost_LIBRARIES})
+
+install(TARGETS rpi-cam-streaming RUNTIME DESTINATION bin)

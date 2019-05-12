@@ -55,6 +55,7 @@ private:
     void handle_new_sample(const uint8_t *data, size_t size);
 
 private:
+	VideoBus &bus_;
     boost::asio::ip::udp::socket socket_;
     boost::asio::ip::udp::endpoint remote_endpoint_;
     boost::array<char, 1 << 16> recv_buffer_;

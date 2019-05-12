@@ -33,29 +33,29 @@
 
 #include <sys/types.h>
 #include <boost/signals2.hpp>
-#include <gstreamermm/pad.h>
 #include <gstreamermm/appsink.h>
 #include <gstreamermm/pipeline.h>
 #include <glibmm/thread.h>
 #include <glibmm/main.h>
-#include <boost/asio/ip/udp.hpp>
 
 class VideoBus : public boost::signals2::signal<void(const uint8_t *, size_t size)>
 {
 public:
 
-    VideoBus();
+	VideoBus();
+
+	void start();
 
 private:
 
-    Gst::FlowReturn onNewSample();
+	Gst::FlowReturn onNewSample();
 
-    void run();
+	void run();
 
 private:
-    Glib::RefPtr<Glib::MainLoop> loop;
-    Glib::Thread *worker;
-    Glib::RefPtr<Gst::AppSink> appsink;
+	Glib::RefPtr<Glib::MainLoop> loop;
+	Glib::Thread *worker = nullptr;
+	Glib::RefPtr<Gst::AppSink> appsink;
 };
 
 

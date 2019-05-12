@@ -1,0 +1,6 @@
+RPI_CAM_STREAMING_VERSION = 0.0.1
+RPI_CAM_STREAMING_SITE = $(BR2_EXTERNAL_RPI_CAM_STREAMING_PATH)/..
+RPI_CAM_STREAMING_SITE_METHOD = local
+RPI_CAM_STREAMING_DEPENDENCIES = boost gstreamer1-mm glibmm gst1-plugins-good
+
+$(eval $(cmake-package))

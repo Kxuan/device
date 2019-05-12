@@ -29,65 +29,77 @@
  * 
  */
 #include "VideoBus.hpp"
-#include <gstreamermm.h>
-#include <glibmm.h>
 #include <iostream>
+#include <glibmm/thread.h>
+#include <glibmm/main.h>
+#include <gstreamermm/appsink.h>
+#include <gstreamermm/pipeline.h>
+#include <gstreamermm/element.h>
+#include <gstreamermm/elementfactory.h>
+#include <gstreamermm/caps.h>
+#include <gstreamermm/init.h>
 
 VideoBus::VideoBus()
 {
-    Glib::thread_init();
-    Gst::init();
+	Glib::thread_init();
+	Gst::init();
 
-    loop = Glib::MainLoop::create();
-    worker = Glib::Thread::create(sigc::mem_fun(*this, &VideoBus::run));
+	loop = Glib::MainLoop::create();
 }
 
 Gst::FlowReturn VideoBus::onNewSample()
 {
-    auto sample = appsink->pull_sample();
-    if (sample) {
-        auto buf = sample->get_buffer();
-        Gst::MapInfo mi;
-        buf->map(mi, Gst::MapFlags::MAP_READ);
+	auto sample = appsink->pull_sample();
+	if (sample) {
+		auto buf = sample->get_buffer();
+		Gst::MapInfo mi;
+		buf->map(mi, Gst::MapFlags::MAP_READ);
 
-        (*this)(mi.get_data(), mi.get_size());
-        buf->unmap(mi);
-    }
-    return Gst::FlowReturn::FLOW_OK;
+		(*this)(mi.get_data(), mi.get_size());
+		buf->unmap(mi);
+		std::cout << '.';
+		std::flush(std::cout);
+	}
+	return Gst::FlowReturn::FLOW_OK;
 }
 
 void VideoBus::run()
 {
 
-    auto pipeline = Gst::Pipeline::create();
-    auto v4l2src = Gst::ElementFactory::create_element("v4l2src");
-    std::string devicename = "/dev/video0";
-    v4l2src->set_property("device", devicename);
+	auto pipeline = Gst::Pipeline::create();
+	auto v4l2src = Gst::ElementFactory::create_element("v4l2src");
+	std::string devicename = "/dev/video0";
+	v4l2src->set_property("device", devicename);
 
-    appsink = Gst::AppSink::create();
-    appsink->signal_new_sample().connect(sigc::mem_fun(*this, &VideoBus::onNewSample));
-    appsink->set_property("emit-signals", true);
+	appsink = Gst::AppSink::create();
+	appsink->signal_new_sample().connect(sigc::mem_fun(*this, &VideoBus::onNewSample));
+	appsink->set_property("emit-signals", true);
 
 #ifdef __x86_64__
-    auto videoconvert = Gst::VideoConvert::create();
-    auto x264enc = Gst::ElementFactory::create_element("x264enc");
-    auto rtph264pay = Gst::ElementFactory::create_element("rtph264pay");
+	auto videoconvert = Gst::VideoConvert::create();
+	auto x264enc = Gst::ElementFactory::create_element("x264enc");
+	auto rtph264pay = Gst::ElementFactory::create_element("rtph264pay");
 
-    pipeline->add(v4l2src)->add(videoconvert)->add(x264enc)->add(rtph264pay)->add(appsink);
-    v4l2src->link(videoconvert)->link(x264enc)->link(rtph264pay)->link(appsink);
+	pipeline->add(v4l2src)->add(videoconvert)->add(x264enc)->add(rtph264pay)->add(appsink);
+	v4l2src->link(videoconvert)->link(x264enc)->link(rtph264pay)->link(appsink);
 #else
-    auto rtph264pay = Gst::ElementFactory::create_element("rtph264pay");
-    auto caps = Gst::Caps::create_simple("video/x-h264",
-                                         "width", 1280,
-                                         "height", 720,
-                                         "framerate", "30/1");
+	auto rtph264pay = Gst::ElementFactory::create_element("rtph264pay");
+	auto caps = Gst::Caps::create_from_string("video/x-h264,width=1280,height=720,framerate=30/1");
 
-    pipeline->add(v4l2src)->add(rtph264pay)->add(appsink);
-    v4l2src->link(rtph264pay, caps)->link(appsink);
+	pipeline->add(v4l2src)->add(rtph264pay)->add(appsink);
+	v4l2src->link(rtph264pay, caps)->link(appsink);
 #endif
 
-    pipeline->set_state(Gst::State::STATE_PLAYING);
-    loop->run();
-    pipeline->set_state(Gst::State::STATE_NULL);
-    appsink.reset();
+	pipeline->set_state(Gst::State::STATE_PLAYING);
+	loop->run();
+	pipeline->set_state(Gst::State::STATE_NULL);
+	appsink.reset();
+}
+
+void VideoBus::start()
+{
+	if (worker) {
+		return;
+	}
+	worker = Glib::Thread::create(sigc::mem_fun(*this, &VideoBus::run));
 }

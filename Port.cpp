@@ -38,46 +38,48 @@
 using boost::asio::ip::udp;
 
 Port::Port(boost::asio::io_context &io_context, const std::string &name, VideoBus &bus)
-        : socket_(io_context, udp::endpoint(udp::v6(), DEFAULT_PORT_NUMBER)),
-          name(name)
+		: bus_(bus), socket_(io_context, udp::endpoint(udp::v6(), DEFAULT_PORT_NUMBER)),
+		  name(name)
 {
 
-    connection = bus.connect(std::bind(&Port::handle_new_sample, this, std::placeholders::_1, std::placeholders::_2));
-    start_receive();
+	connection = bus.connect(std::bind(&Port::handle_new_sample, this, std::placeholders::_1, std::placeholders::_2));
+	start_receive();
 }
 
 void Port::start_receive()
 {
-    socket_.async_receive_from(
-            boost::asio::buffer(recv_buffer_), remote_endpoint_,
-            boost::bind(&Port::handle_receive, this,
-                        boost::asio::placeholders::error,
-                        boost::asio::placeholders::bytes_transferred));
+	socket_.async_receive_from(
+			boost::asio::buffer(recv_buffer_), remote_endpoint_,
+			boost::bind(&Port::handle_receive, this,
+			            boost::asio::placeholders::error,
+			            boost::asio::placeholders::bytes_transferred));
 }
 
 void Port::handle_receive(const boost::system::error_code &error, std::size_t nbytes)
 {
-    if (!error) {
-        endpoints.emplace(remote_endpoint_);
-        std::cout << "New endpoint: " << remote_endpoint_ << std::endl;
-        start_receive();
-    }
+	if (!error) {
+		endpoints.emplace(remote_endpoint_);
+		bus_.start();
+		std::cout << "New endpoint: " << remote_endpoint_ << std::endl;
+		start_receive();
+	}
 }
 
 void Port::handle_send(const std::shared_ptr<std::string> &ptr, const boost::system::error_code &ec, std::size_t nbytes)
 {
-    std::cout << *ptr << ec.message() << nbytes << std::endl;
+	std::cout << *ptr << ec.message() << nbytes << std::endl;
 }
 
 void Port::handle_new_sample(const uint8_t *data, size_t size)
 {
-    std::promise<void> p;
-    boost::asio::post(boost::asio::bind_executor(socket_.get_executor(), [this, data, size, &p]() {
-        for (auto &ep:endpoints) {
-            socket_.send_to(boost::asio::buffer(data, size), ep);
-        }
-        p.set_value();
-    }));
-    auto f = p.get_future();
-    f.wait();
+	std::promise<void> p;
+	boost::asio::post(boost::asio::bind_executor(socket_.get_executor(), [this, data, size, &p]()
+	{
+		for (auto &ep:endpoints) {
+			socket_.send_to(boost::asio::buffer(data, size), ep);
+		}
+		p.set_value();
+	}));
+	auto f = p.get_future();
+	f.wait();
 }

@@ -1,0 +1,8 @@
+config BR2_PACKAGE_MIJIA_GATEWAY_AUTOMATION
+        bool "rpi camera streaming"
+        select BR2_PACKAGE_BOOST
+        select BR2_PACKAGE_BOOST_SYSTEM
+        select BR2_PACKAGE_GLIBMM
+        select BR2_PACKAGE_GSTREAMER1_MM
+        help
+                Automation module for MiJia Gateway
